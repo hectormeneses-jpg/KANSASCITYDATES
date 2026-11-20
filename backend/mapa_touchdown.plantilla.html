@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Probabilidad de touchdown en las últimas yardas</title>
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--panel2:#1d242e;--borde:#2b3441;--txt:#e6edf3;--tenue:#8b98a9;--acento:#19e3b1;--aviso:#f5b942}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.pagina{max-width:1120px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:1.65rem;line-height:1.2;margin:0 0 6px}
+h2{font-size:1.1rem;margin:0}
+.sub{color:var(--tenue);margin:0;max-width:78ch}
+.tenue{color:var(--tenue)}
+.aviso{color:var(--aviso)}
+button,select{font:inherit;color:inherit}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:20px}
+.kpi{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:14px 16px}
+.kpi-t{color:var(--tenue);font-size:.85rem}
+.kpi-v{font-size:2rem;font-weight:700;line-height:1.25}
+.kpi-s{color:var(--tenue);font-size:.82rem}
+
+.tarjeta{background:var(--panel);border:1px solid var(--borde);border-radius:12px;padding:16px 18px;margin-top:16px}
+.cab{display:flex;flex-wrap:wrap;gap:4px 16px;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+
+.filtros{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:flex-end}
+.grupo{display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.etq{font-size:.78rem;color:var(--tenue);text-transform:uppercase;letter-spacing:.04em}
+.seg{display:inline-flex;border:1px solid var(--borde);border-radius:8px;overflow:hidden}
+.seg button{background:transparent;border:0;border-right:1px solid var(--borde);padding:6px 10px;cursor:pointer;color:var(--tenue)}
+.seg button:last-child{border-right:0}
+.seg button:hover{background:var(--panel2);color:var(--txt)}
+.seg button[aria-pressed=true]{background:var(--acento);color:#04110c;font-weight:600}
+select{background:var(--panel2);border:1px solid var(--borde);border-radius:8px;padding:6px 10px}
+.reset{background:transparent;border:1px solid var(--borde);border-radius:8px;padding:6px 12px;cursor:pointer;color:var(--tenue)}
+.reset:hover{color:var(--txt);background:var(--panel2)}
+.inactivo{opacity:.45}
+
+.scroll{overflow-x:auto}
+#mapa{display:block;width:100%;min-width:760px;height:auto}
+#mapa text{pointer-events:none;font-family:inherit}
+#mapa .eje{fill:var(--tenue);font-size:12px}
+#mapa .fila{fill:var(--txt);font-size:14px}
+#mapa .ez{fill:#a9798c;font-size:13px;letter-spacing:.18em}
+#mapa .yl{stroke:#fff;stroke-opacity:.28;stroke-dasharray:3 5;pointer-events:none}
+#mapa .gl{stroke:#fff;stroke-opacity:.9;stroke-width:2.5;pointer-events:none}
+#mapa .tick{stroke:#8b98a9;stroke-opacity:.6}
+#mapa .celda{cursor:pointer}
+#mapa .celda rect{stroke:#0d1117;stroke-width:0}
+#mapa .celda:hover rect{stroke:#fff;stroke-width:2}
+#mapa .celda.sel rect{stroke:#fff;stroke-width:3}
+#mapa .p{font-size:18px;font-weight:700;text-anchor:middle;dominant-baseline:middle}
+#mapa .p.chico{font-size:13px}
+#mapa .s{font-size:11px;text-anchor:middle;dominant-baseline:middle;opacity:.85}
+#mapa .poca{font-size:11px;fill:var(--tenue);text-anchor:middle;dominant-baseline:middle}
+#mapa .punto{stroke:#05080c;stroke-width:1.5;cursor:help}
+#mapa .punto.td{fill:var(--acento)}
+#mapa .punto.no{fill:#fff;fill-opacity:.9}
+.leyenda{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-top:10px;font-size:.82rem;color:var(--tenue)}
+.leyenda .barra{display:inline-block;width:180px;height:10px;border-radius:5px;vertical-align:middle;margin:0 6px}
+.leyenda .hatch{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;background:repeating-linear-gradient(45deg,#19212b 0 3px,#2b3745 3px 5px);border:1px solid var(--borde)}
+.leyenda .d{display:inline-block;width:11px;height:11px;border-radius:50%;vertical-align:middle;margin-right:5px;border:1.5px solid #05080c}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.chip{background:var(--panel2);border:1px solid var(--borde);border-radius:999px;padding:3px 6px 3px 12px;font-size:.85rem}
+.chip button{background:transparent;border:0;cursor:pointer;color:var(--tenue);padding:0 6px}
+.chip button:hover{color:var(--txt)}
+table.tabla{width:100%;border-collapse:collapse;margin-top:8px;font-variant-numeric:tabular-nums}
+.tabla th{font-size:.78rem;font-weight:600;color:var(--tenue);text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:6px 8px;border-bottom:1px solid var(--borde);white-space:nowrap}
+.tabla td{padding:7px 8px;border-bottom:1px solid #20283a;white-space:nowrap}
+.tabla .num{text-align:right}
+.tabla tbody tr{cursor:pointer}
+.tabla tbody tr:hover{background:var(--panel2)}
+.tabla tbody tr.activa{background:#12312a;outline:1px solid var(--acento)}
+svg.rango{display:inline-block;vertical-align:middle;margin-right:8px}
+svg.rango .pista{stroke:#33405a;stroke-width:2}
+svg.rango .ic{fill:#3b82f6;fill-opacity:.55}
+svg.rango .pt{fill:var(--acento);stroke:#05080c;stroke-width:1}
+.mas{margin-top:10px;background:transparent;border:1px solid var(--borde);border-radius:8px;padding:6px 14px;cursor:pointer;color:var(--tenue)}
+.mas:hover{color:var(--txt);background:var(--panel2)}
+.vacio{padding:18px 4px;color:var(--tenue)}
+.notas ul{margin:8px 0 0;padding-left:20px}
+.notas li{margin:5px 0;color:#c4cdda}
+.notas b{color:var(--txt)}
+
+#tip{position:fixed;left:0;top:0;z-index:10;max-width:360px;background:#06090d;border:1px solid var(--borde);border-radius:8px;padding:9px 12px;font-size:.84rem;line-height:1.45;pointer-events:none;opacity:0;box-shadow:0 6px 22px rgba(0,0,0,.5)}
+#tip b{color:#fff}
+</style>
+</head>
+<body>
+<noscript>Este mapa necesita JavaScript activado.</noscript>
+<div class="pagina">
+  <header>
+    <h1>Probabilidad de touchdown en las últimas yardas</h1>
+    <p class="sub" id="subtitulo"></p>
+  </header>
+
+  <section class="kpis" id="kpis" aria-label="Probabilidad de touchdown por tramo"></section>
+
+  <section class="tarjeta" aria-label="Filtros">
+    <div class="filtros" id="filtros"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-mapa">
+    <div class="cab">
+      <h2 id="t-mapa">Mapa del campo: probabilidad de TD según la yarda y el carril del pase</h2>
+      <span class="tenue" id="n-mapa"></span>
+    </div>
+    <p class="tenue" style="margin:0 0 6px;font-size:.88rem">Pasa el cursor sobre una celda para ver el detalle. Haz clic para ver qué jugadores anotan ahí.</p>
+    <div class="scroll"><svg id="mapa" role="img" aria-label="Mapa del campo con la probabilidad de touchdown por yarda y carril"></svg></div>
+    <div class="leyenda" id="leyenda"></div>
+  </section>
+
+  <section class="tarjeta" aria-labelledby="t-jug">
+    <div class="cab">
+      <h2 id="t-jug">Jugadores con mayor probabilidad de acierto</h2>
+      <span class="tenue" id="n-jug"></span>
+    </div>
+    <div class="filtros" id="ctrl-jug"></div>
+    <div class="chips" id="chips"></div>
+    <div class="scroll" id="tabla"></div>
+  </section>
+
+  <section class="tarjeta notas" aria-labelledby="t-notas">
+    <h2 id="t-notas">Cómo leer estos números</h2>
+    <ul id="notas"></ul>
+  </section>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script type="application/json" id="datos">__DATOS__</script>
+<script>
+(() => {
+'use strict';
+
+const D = JSON.parse(document.getElementById('datos').textContent);
+const M = D.meta, J = D.jugadas, P = D.jugadores, Y = M.yardas;
+
+const MIN_N = 5;     // una celda con menos jugadas se marca como "poca muestra"
+const Z95 = 1.96;
+const TOPE = 0.6;    // probabilidad que corresponde al color más cálido
+const RAMPA = [[0, [13, 8, 135]], [0.25, [126, 3, 168]], [0.5, [204, 71, 120]], [0.75, [248, 149, 64]], [1, [240, 249, 33]]];
+const FILAS = [['izq', 'Izquierda', ''], ['cen', 'Centro', ''], ['der', 'Derecha', ''], ['todos', 'Todos', 'los pases']];
+const LADO = {izq: 'pases por la izquierda', cen: 'pases por el centro', der: 'pases por la derecha', todos: 'todos los pases'};
+const RESULTADOS = [['TD', 'touchdowns'], ['C', 'completos sin TD'], ['R', 'scrambles sin TD'], ['I', 'incompletos'], ['IN', 'intercepciones'], ['S', 'sacks']];
+const BINS = [1, 2, 5].filter(b => Y % b === 0);
+const ZONAS = [...new Set([5, 10, Y].filter(z => z <= Y))].sort((a, b) => a - b);
+const EQUIPOS = [...new Set(J.map(j => j.eq))].sort();
+const POR_DEFECTO = {down: 0, cob: '', eq: '', bin: BINS.includes(2) ? 2 : BINS[0], zona: Y, vista: 'ob', min: 5, orden: 'lo', celda: null, jug: null, todos: false};
+const est = {...POR_DEFECTO};
+const NUMERICOS = new Set(['down', 'bin', 'zona', 'min']);
+const TIPS = [];
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+const pct = (p, d = 0) => (p * 100).toFixed(d) + '%';
+const num = n => n.toLocaleString('es-MX');
+
+// Intervalo de Wilson para una proporción k/n (95 %). Con pocas jugadas es muy ancho.
+function rango(k, n) {
+  if (!n) return [0, 0];
+  const p = k / n, z2 = Z95 * Z95, den = 1 + z2 / n;
+  const centro = (p + z2 / (2 * n)) / den;
+  const mitad = Z95 * Math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / den;
+  return [Math.max(0, centro - mitad), Math.min(1, centro + mitad)];
+}
+function rgb(p) {
+  const t = Math.max(0, Math.min(1, p / TOPE));
+  for (let i = 1; i < RAMPA.length; i++) {
+    if (t <= RAMPA[i][0]) {
+      const [t0, c0] = RAMPA[i - 1], [t1, c1] = RAMPA[i], u = (t - t0) / (t1 - t0);
+      return c0.map((v, k) => Math.round(v + (c1[k] - v) * u));
+    }
+  }
+  return RAMPA[RAMPA.length - 1][1];
+}
+const luz = c => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+const contar = a => { const c = {n: a.length, TD: 0, C: 0, R: 0, I: 0, IN: 0, S: 0}; for (const j of a) c[j.r]++; return c; };
+const binDe = y => Math.floor((y - 1) / est.bin);
+const etiquetaYardas = i => { const a = i * est.bin + 1, b = Math.min(Y, (i + 1) * est.bin); return a === b ? `Yarda ${a}` : `Yardas ${a}–${b}`; };
+const filtradas = () => J.filter(j => (!est.down || j.d === est.down) && (!est.cob || j.cob === est.cob) && (!est.eq || j.eq === est.eq));
+
+/* ---------- controles ---------- */
+const seg = (k, ops) => `<div class="seg" role="group">${ops.map(([v, t]) => `<button type="button" data-k="${k}" data-v="${v}" aria-pressed="false">${t}</button>`).join('')}</div>`;
+const sel = (k, ops) => `<select data-k="${k}">${ops.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('')}</select>`;
+const grupo = (titulo, html, id = '') => `<div class="grupo"${id ? ` id="${id}"` : ''}><span class="etq">${titulo}</span>${html}</div>`;
+
+function armarControles() {
+  $('#filtros').innerHTML =
+    grupo('Down', seg('down', [[0, 'Todos'], [1, '1º'], [2, '2º'], [3, '3º'], [4, '4º']])) +
+    grupo('Cobertura de la defensa', seg('cob', [['', 'Todas'], ['Man', 'Hombre'], ['Zone', 'Zona'], ['Other', 'Otra']])) +
+    grupo('Equipo en ataque', sel('eq', [['', 'Todos'], ...EQUIPOS.map(e => [e, e])])) +
+    grupo('Tamaño de celda', seg('bin', BINS.map(b => [b, b === 1 ? '1 yarda' : `${b} yardas`]))) +
+    `<button type="button" class="reset" data-reset>Restablecer</button>`;
+  $('#ctrl-jug').innerHTML =
+    grupo('Mostrar', seg('vista', [['ob', 'Receptores'], ['qb', 'Quarterbacks']])) +
+    grupo('Zona: últimas yardas', seg('zona', ZONAS.map(z => [z, z])), 'g-zona') +
+    grupo('Mínimo de jugadas', sel('min', [1, 3, 5, 8, 10, 15].map(v => [v, v]))) +
+    grupo('Ordenar por', sel('orden', [['lo', 'Más fiable (límite inferior del rango)'], ['p', '% de acierto'], ['td', 'Total de TD']]));
+  $('#leyenda').innerHTML =
+    `<span>0%<span class="barra" style="background:linear-gradient(90deg,${RAMPA.map(([t, c]) => `rgb(${c}) ${t * 100}%`).join(',')})"></span>${pct(TOPE)} o más</span>` +
+    `<span><i class="hatch"></i>menos de ${MIN_N} jugadas (poca muestra)</span><span id="leyenda-jug"></span>`;
+}
+function sincronizarControles() {
+  document.querySelectorAll('button[data-k]').forEach(b => b.setAttribute('aria-pressed', String(est[b.dataset.k]) === b.dataset.v));
+  document.querySelectorAll('select[data-k]').forEach(s => { s.value = est[s.dataset.k]; });
+  $('#g-zona').classList.toggle('inactivo', !!est.celda);
+}
+
+/* ---------- tarjetas de arriba ---------- */
+function pintarKpis(F) {
+  $('#kpis').innerHTML = ZONAS.map(z => {
+    const c = contar(F.filter(j => j.y <= z)), [lo, hi] = rango(c.TD, c.n);
+    return `<div class="kpi"><div class="kpi-t">Últimas ${z} yardas</div><div class="kpi-v">${c.n ? pct(c.TD / c.n, 1) : '—'}</div>` +
+      `<div class="kpi-s">${c.TD} TD en ${num(c.n)} jugadas${c.n ? ` · rango 95%: ${pct(lo)}–${pct(hi)}` : ''}</div></div>`;
+  }).join('');
+}
+
+/* ---------- mapa ---------- */
+function tipCelda(f, i, a, c) {
+  let h = `<b>${etiquetaYardas(i)} · ${LADO[f]}</b>`;
+  if (!c.n) return h + '<br>Sin jugadas con este filtro.';
+  const [lo, hi] = rango(c.TD, c.n);
+  h += `<br>${c.TD} TD en ${c.n} jugadas: <b>${pct(c.TD / c.n, 1)}</b>`;
+  h += `<br>Rango 95%: ${pct(lo)}–${pct(hi)}${c.n < MIN_N ? ' · <span class="aviso">poca muestra</span>' : ''}`;
+  h += `<br><span class="tenue">${RESULTADOS.filter(([k]) => c[k]).map(([k, t]) => `${c[k]} ${t}`).join(' · ')}</span>`;
+  const m = new Map();
+  for (const j of a) if (j.r === 'TD' && j.ob != null) m.set(j.ob, (m.get(j.ob) || 0) + 1);
+  const top = [...m].sort((x, y) => y[1] - x[1]).slice(0, 3).map(([id, k]) => `${esc(P[id].n)} (${k})`);
+  if (top.length) h += `<br>TD de: ${top.join(', ')}`;
+  return h + '<br><span class="tenue">Clic para ver los jugadores de esta celda</span>';
+}
+function tipJugada(j) {
+  return `<b>${j.r === 'TD' ? 'Touchdown' : 'Sin touchdown'} · a ${j.y} yardas</b><br>Semana ${j.sem} · ${j.eq} vs ${j.rv} · cuarto ${j.q} · down ${j.d}<br><span class="tenue">${esc(j.txt)}</span>`;
+}
+function textoCelda(c, xa, xb, y0, h, col) {
+  const cx = (xa + xb) / 2, cy = y0 + h / 2;
+  if (!c.n) return `<text class="poca" x="${cx}" y="${cy}">—</text>`;
+  if (c.n < MIN_N) return `<text class="poca" x="${cx}" y="${cy}">n=${c.n}</text>`;
+  const relleno = luz(col) > 0.55 ? '#10141a' : '#fff', p = pct(c.TD / c.n);
+  if (xb - xa >= 70 && h >= 56) {
+    return `<text class="p" fill="${relleno}" x="${cx}" y="${cy - 6}">${p}</text><text class="s" fill="${relleno}" x="${cx}" y="${cy + 14}">${c.TD} de ${c.n}</text>`;
+  }
+  return `<text class="p chico" fill="${relleno}" x="${cx}" y="${cy}">${p}</text>`;
+}
+function pintarMapa(F) {
+  TIPS.length = 0;
+  const b = est.bin, nb = Math.ceil(Y / b);
+  const W = 1000, mL = 100, mR = 10, zA = 76, top = 34, hF = 68, gap = 6, sep = 16, hT = 60, eje = 64;
+  const campoW = W - mL - mR - zA, px = campoW / Y, gl = mL + campoW;
+  const yF = i => top + i * (hF + gap) + (i === 3 ? sep - gap : 0);
+  const hFila = i => (i === 3 ? hT : hF);
+  const fin = yF(3) + hT, H = fin + eje;
+
+  const celdas = {};
+  FILAS.forEach(([f]) => { celdas[f] = Array.from({length: nb}, () => []); });
+  for (const j of F) { const i = binDe(j.y); celdas.todos[i].push(j); if (j.c) celdas[j.c][i].push(j); }
+
+  let s = `<defs><pattern id="poca" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="7" height="7" fill="#19212b"/><rect width="2.5" height="7" fill="#2b3745"/></pattern>` +
+    `<linearGradient id="zona-anot" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a1220"/><stop offset="1" stop-color="#24101a"/></linearGradient></defs>`;
+  s += `<rect x="${mL}" y="${top - 8}" width="${campoW}" height="${fin - top + 16}" rx="4" fill="#0f2a1d"/>`;
+  s += `<rect x="${gl}" y="${top - 8}" width="${zA}" height="${fin - top + 16}" rx="4" fill="url(#zona-anot)"/>`;
+  s += `<text class="ez" transform="translate(${gl + zA / 2} ${(top + fin) / 2}) rotate(90)" text-anchor="middle" dominant-baseline="middle">ZONA DE ANOTACIÓN</text>`;
+  s += `<text class="eje" x="${mL}" y="${top - 16}">La ofensiva avanza hacia la derecha ▶</text>`;
+
+  FILAS.forEach(([f, nombre, sub], r) => {
+    const y0 = yF(r), h = hFila(r);
+    s += `<text class="fila" x="${mL - 12}" y="${y0 + h / 2 - (sub ? 8 : 0)}" text-anchor="end" dominant-baseline="middle">${nombre}</text>`;
+    if (sub) s += `<text class="eje" x="${mL - 12}" y="${y0 + h / 2 + 10}" text-anchor="end" dominant-baseline="middle">${sub}</text>`;
+    for (let i = 0; i < nb; i++) {
+      const a = celdas[f][i], c = contar(a), p = c.n ? c.TD / c.n : 0, col = rgb(p);
+      const xa = gl - Math.min(Y, (i + 1) * b) * px, xb = gl - i * b * px;
+      const fill = !c.n ? 'none' : c.n < MIN_N ? 'url(#poca)' : `rgb(${col})`;
+      const activa = est.celda && est.celda.f === f && est.celda.i === i;
+      const idx = TIPS.push(tipCelda(f, i, a, c)) - 1;
+      const etq = `${etiquetaYardas(i)}, ${LADO[f]}: ${c.n ? `${c.TD} touchdowns en ${c.n} jugadas` : 'sin jugadas'}`;
+      s += `<g class="celda${activa ? ' sel' : ''}" data-tip="${idx}" data-f="${f}" data-i="${i}" role="button" aria-label="${esc(etq)}">` +
+        `<rect x="${xa + 1}" y="${y0}" width="${xb - xa - 2}" height="${h}" rx="4" fill="${fill}"${c.n ? '' : ' stroke="#2b3441" stroke-dasharray="4 4"'}/>` +
+        textoCelda(c, xa, xb, y0, h, col) + `</g>`;
+    }
+  });
+
+  for (let v = 0; v <= Y; v += 5) {
+    const x = gl - v * px;
+    s += `<line class="${v === 0 ? 'gl' : 'yl'}" x1="${x}" x2="${x}" y1="${top - 8}" y2="${fin + 8}"/>`;
+    s += `<text class="eje" x="${x}" y="${fin + 32}" text-anchor="middle">${v === 0 ? 'Línea de gol' : v}</text>`;
+  }
+  for (let v = 0; v <= Y; v++) s += `<line class="tick" x1="${gl - v * px}" x2="${gl - v * px}" y1="${fin + 8}" y2="${fin + 14}"/>`;
+  s += `<text class="eje" x="${mL + campoW / 2}" y="${fin + 56}" text-anchor="middle">Yardas que faltan para la zona de anotación</text>`;
+
+  if (est.jug) {
+    const mias = F.filter(j => j[est.jug.rol] === est.jug.id);
+    mias.forEach((j, k) => {
+      const r = j.c ? FILAS.findIndex(([f]) => f === j.c) : 3;
+      // el punto va en la franja inferior de la celda para no tapar el porcentaje
+      const cx = gl - (j.y - 0.5) * px + ((k * 7) % 5 - 2) * 1.5;
+      const cy = yF(r) + hFila(r) - 11 - (k % 3) * 6;
+      const idx = TIPS.push(tipJugada(j)) - 1;
+      s += `<circle class="punto ${j.r === 'TD' ? 'td' : 'no'}" data-tip="${idx}" cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${j.r === 'TD' ? 7.5 : 5.5}"/>`;
+    });
+    const tds = mias.filter(j => j.r === 'TD').length;
+    $('#leyenda-jug').innerHTML = `<b>${esc(P[est.jug.id].n)}</b>: <i class="d" style="background:var(--acento)"></i>${tds} TD <i class="d" style="background:#fff"></i>${mias.length - tds} sin TD`;
+  } else {
+    $('#leyenda-jug').innerHTML = '';
+  }
+  $('#mapa').setAttribute('viewBox', `0 0 ${W} ${H}`);
+  $('#mapa').innerHTML = s;
+  $('#n-mapa').textContent = `${num(F.length)} jugadas con el filtro actual`;
+}
+
+/* ---------- jugadores ---------- */
+function barra(a) {
+  const w = 130, x = v => (v * w).toFixed(1);
+  return `<svg class="rango" viewBox="0 0 ${w} 16" width="${w}" height="16" aria-hidden="true"><line class="pista" x1="0" x2="${w}" y1="8" y2="8"/>` +
+    `<rect class="ic" x="${x(a.lo)}" y="4" width="${Math.max(2, (a.hi - a.lo) * w).toFixed(1)}" height="8" rx="3"/><circle class="pt" cx="${x(a.p)}" cy="8" r="4"/></svg>`;
+}
+function pintarJugadores(F) {
+  let jugadas;
+  if (est.celda) jugadas = F.filter(j => (est.celda.f === 'todos' || j.c === est.celda.f) && binDe(j.y) === est.celda.i);
+  else jugadas = F.filter(j => j.y <= est.zona);
+
+  const g = new Map();
+  for (const j of jugadas) {
+    const id = j[est.vista];
+    if (id == null) continue;
+    const a = g.get(id) || g.set(id, {id, n: 0, td: 0, sy: 0}).get(id);
+    a.n++; a.sy += j.y; if (j.r === 'TD') a.td++;
+  }
+  const todas = [...g.values()].filter(a => a.n >= est.min);
+  for (const a of todas) { a.p = a.td / a.n; [a.lo, a.hi] = rango(a.td, a.n); a.y = a.sy / a.n; }
+  const clave = {lo: a => [a.lo, a.p, a.n], p: a => [a.p, a.n, a.td], td: a => [a.td, a.p, a.n]}[est.orden];
+  todas.sort((u, v) => { const x = clave(u), y = clave(v); return (y[0] - x[0]) || (y[1] - x[1]) || (y[2] - x[2]); });
+  const vistas = est.todos ? todas : todas.slice(0, 15);
+
+  const chips = [];
+  if (est.celda) chips.push(`<span class="chip">Celda: ${etiquetaYardas(est.celda.i).toLowerCase()} · ${LADO[est.celda.f]} <button type="button" data-quitar="celda" aria-label="Quitar filtro de celda">✕</button></span>`);
+  if (est.jug) chips.push(`<span class="chip">En el mapa: ${esc(P[est.jug.id].n)} <button type="button" data-quitar="jug" aria-label="Quitar jugador del mapa">✕</button></span>`);
+  $('#chips').innerHTML = chips.join('');
+
+  const rol = est.vista === 'ob' ? 'Objetivos' : 'Dropbacks';
+  const ambito = est.celda ? 'en la celda elegida' : `en las últimas ${est.zona} yardas`;
+  $('#n-jug').textContent = `${num(todas.length)} jugadores con al menos ${est.min} jugadas ${ambito}`;
+  if (!todas.length) {
+    $('#tabla').innerHTML = `<p class="vacio">Ningún jugador llega a ${est.min} jugadas con este filtro. Baja el mínimo de jugadas o amplía la zona.</p>`;
+    return;
+  }
+  let h = `<table class="tabla"><thead><tr><th>#</th><th>Jugador</th><th class="num">${rol}</th><th class="num">TD</th><th class="num">% de acierto</th><th>Rango 95%</th><th class="num">Yarda prom.</th></tr></thead><tbody>`;
+  vistas.forEach((a, k) => {
+    const f = P[a.id], activa = est.jug && est.jug.id === a.id && est.jug.rol === est.vista;
+    h += `<tr data-id="${a.id}"${activa ? ' class="activa"' : ''} title="Clic para ver sus jugadas en el mapa"><td class="tenue">${k + 1}</td>` +
+      `<td><b>${esc(f.n)}</b> <span class="tenue">${esc(f.eq)} · ${esc(f.pos)}</span></td><td class="num">${a.n}</td><td class="num">${a.td}</td>` +
+      `<td class="num"><b>${pct(a.p)}</b></td><td>${barra(a)} <span class="tenue">${pct(a.lo)}–${pct(a.hi)}</span></td><td class="num">${a.y.toFixed(1)}</td></tr>`;
+  });
+  h += '</tbody></table>';
+  if (todas.length > 15) h += `<button type="button" class="mas" data-mas>${est.todos ? 'Mostrar solo los 15 primeros' : `Ver los ${todas.length}`}</button>`;
+  $('#tabla').innerHTML = h;
+}
+
+function notas() {
+  $('#subtitulo').textContent = `Jugadas de pase de la NFL, semanas ${M.semanas[0]} a ${M.semanas[1]} de ${M.temporada} (${M.juegos} partidos, Big Data Bowl). ` +
+    `Cada celda indica con qué frecuencia una jugada de pase que arranca en esa yarda termina en touchdown de la ofensiva.`;
+  $('#notas').innerHTML = [
+    `<b>Yarda</b>: distancia entre el balón y la zona de anotación al empezar la jugada. En la yarda 3 faltan 3 yardas.`,
+    `<b>Probabilidad de TD</b>: porcentaje de jugadas de pase que terminan en touchdown de la ofensiva, ya sea por pase completo o por scramble del quarterback. No cuentan los TD de la defensa (intercepciones o fumbles devueltos), los anulados por penalización ni los revertidos por replay.`,
+    `<b>Solo pases</b>: los datos incluyen jugadas de pase y scrambles, no carreras. Es la probabilidad de TD cuando el equipo pasa, no la probabilidad total de anotar desde esa yarda.`,
+    `<b>Carril</b>: dirección del pase según la descripción de la jugada, vista desde la ofensiva (izquierda, centro o derecha). No hay datos de tracking, así que no se conoce la posición exacta del balón. Los sacks y los pases sin dirección solo cuentan en la fila "Todos los pases".`,
+    `<b>Rango 95%</b>: intervalo de Wilson. Con pocas jugadas es muy ancho, y por eso las celdas con menos de ${MIN_N} jugadas aparecen rayadas y sin porcentaje.`,
+    `<b>Acierto de un jugador</b>: en los receptores es TD entre veces que fueron el objetivo del pase. En los quarterbacks es TD (de pase o scramble) entre dropbacks. El orden por defecto usa el límite inferior del rango, que favorece a quien anota mucho y con muestra suficiente. La "yarda prom." indica desde dónde le llegaron las jugadas: cerca de la línea de gol es más fácil anotar.`,
+    `<b>Datos</b>: ${num(M.pases_total)} jugadas de pase en total. ${num(M.en_zona)} empiezan en las últimas ${Y} yardas. Se excluyen ${M.excluidas_2pt} intentos de 2 puntos y ${M.excluidas_anuladas} jugadas anuladas por penalización (No Play). Quedan ${num(M.analizadas)} jugadas con ${M.td} touchdowns. El objetivo de cada pase sale de la descripción cruzada con los jugadores de PFF en esa jugada.`
+  ].map(t => `<li>${t}</li>`).join('');
+}
+
+/* ---------- estado y eventos ---------- */
+function render() {
+  const F = filtradas();
+  pintarKpis(F);
+  pintarMapa(F);
+  pintarJugadores(F);
+  sincronizarControles();
+}
+function poner(k, v) {
+  est[k] = NUMERICOS.has(k) ? +v : v;
+  if (k === 'bin') est.celda = null;     // el número de celda cambia de significado
+  if (k === 'vista') est.todos = false;
+  render();
+}
+
+document.addEventListener('click', e => {
+  const t = e.target;
+  const b = t.closest('button[data-k]');
+  if (b) return poner(b.dataset.k, b.dataset.v);
+  if (t.closest('[data-reset]')) { Object.assign(est, POR_DEFECTO, {vista: est.vista, zona: est.zona, min: est.min, orden: est.orden}); return render(); }
+  const q = t.closest('[data-quitar]');
+  if (q) { est[q.dataset.quitar === 'celda' ? 'celda' : 'jug'] = null; return render(); }
+  if (t.closest('[data-mas]')) { est.todos = !est.todos; return render(); }
+  const celda = t.closest('.celda');
+  if (celda) {
+    const f = celda.dataset.f, i = +celda.dataset.i;
+    est.celda = est.celda && est.celda.f === f && est.celda.i === i ? null : {f, i};
+    return render();
+  }
+  const fila = t.closest('tr[data-id]');
+  if (fila) {
+    const id = +fila.dataset.id;
+    est.jug = est.jug && est.jug.id === id && est.jug.rol === est.vista ? null : {id, rol: est.vista};
+    render();
+  }
+});
+document.addEventListener('change', e => { const s = e.target.closest('select[data-k]'); if (s) poner(s.dataset.k, s.value); });
+
+const tip = $('#tip');
+document.addEventListener('mousemove', e => {
+  const el = e.target.closest('[data-tip]');
+  if (!el) { tip.style.opacity = 0; return; }
+  tip.innerHTML = TIPS[+el.dataset.tip];
+  tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  let x = e.clientX + 16, y = e.clientY + 16;
+  if (x + r.width > innerWidth - 8) x = e.clientX - r.width - 16;
+  if (y + r.height > innerHeight - 8) y = e.clientY - r.height - 16;
+  tip.style.transform = `translate(${Math.max(8, x)}px, ${Math.max(8, y)}px)`;
+});
+document.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
+
+armarControles();
+notas();
+render();
+})();
+</script>
+</body>
+</html>
