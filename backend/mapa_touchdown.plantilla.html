@@ -374,12 +374,18 @@ function notas() {
 }
 
 /* ---------- estado y eventos ---------- */
+// Si la página está incrustada (por ejemplo en el dashboard), avisa su alto para que el marco se ajuste sin barra propia.
+const pagina = $('.pagina');
+const incrustada = window.parent !== window;
+const avisarAlto = () => { if (incrustada) window.parent.postMessage({tipo: 'mapa-touchdown-alto', alto: pagina.offsetHeight}, '*'); };
+
 function render() {
   const F = filtradas();
   pintarKpis(F);
   pintarMapa(F);
   pintarJugadores(F);
   sincronizarControles();
+  avisarAlto();
 }
 function poner(k, v) {
   est[k] = NUMERICOS.has(k) ? +v : v;
@@ -428,6 +434,8 @@ document.addEventListener('mouseleave', () => { tip.style.opacity = 0; });
 armarControles();
 notas();
 render();
+
+if (incrustada) new ResizeObserver(avisarAlto).observe(pagina);   // cambios de ancho de la ventana
 })();
 </script>
 </body>

@@ -27,13 +27,25 @@ Para quien toma decisiones de juego en la zona roja y para quien las analiza:
 
 ## Cómo verlo
 
-1. Abre `mapa_touchdown.html` con doble clic. Es un solo archivo: no necesita internet ni instalar nada.
-2. Pasa el cursor sobre una celda para ver el detalle (TD, jugadas, rango de 95% y quién anotó ahí). Haz clic en la celda para filtrar la tabla de jugadores. Haz clic en un jugador para ver sus jugadas como puntos sobre el campo.
-3. Filtra por down, cobertura de la defensa y equipo en ataque. Cambia el tamaño de celda (1, 2 o 5 yardas), alterna entre receptores y quarterbacks, y elige la zona (últimas 5, 10 o 20 yardas), el mínimo de jugadas y el orden de la tabla.
+- **En la app publicada:** la página de inicio es el mapa. No hay que hacer nada más.
+- **En tu computadora, sin instalar nada:** abre `mapa_touchdown.html` con doble clic. Es un solo archivo y no necesita internet.
+- **En tu computadora, la app completa**, con el entorno ya instalado (`sh .hackathon/setup.sh`). En dos terminales:
+
+  ```bash
+  .venv/bin/uvicorn backend.main:app --reload   # API en el puerto 8000
+  cd dashboard && npm run dev                    # app en http://localhost:5173
+  ```
+
+  Abre `http://localhost:5173` (no `127.0.0.1`). Si `npm` no está en tu PATH, usa el Node del proyecto: `export PATH="$PWD/.hackathon/.tools/node/bin:$PATH"`.
+
+Cómo usarlo:
+
+1. Pasa el cursor sobre una celda para ver el detalle (TD, jugadas, rango de 95% y quién anotó ahí). Haz clic en la celda para filtrar la tabla de jugadores. Haz clic en un jugador para ver sus jugadas como puntos sobre el campo.
+2. Filtra por down, cobertura de la defensa y equipo en ataque. Cambia el tamaño de celda (1, 2 o 5 yardas), alterna entre receptores y quarterbacks, y elige la zona (últimas 5, 10 o 20 yardas), el mínimo de jugadas y el orden de la tabla.
 
 ![Receptores con mayor probabilidad de acierto](captura-jugadores.png)
 
-Para regenerarlo con los datos de `data/`, con el entorno del proyecto ya instalado (`sh .hackathon/setup.sh`):
+El backend calcula el mapa con pandas la primera vez que se pide y lo guarda en memoria, sin escribir archivos. Para regenerar la copia estática `mapa_touchdown.html`:
 
 ```bash
 .venv/bin/python -m backend.mapa_touchdown
@@ -62,7 +74,9 @@ Opciones: `--yardas 25` cambia cuántas yardas finales se muestran (de 5 a 30) y
 ## Datos y estructura
 
 - `data/`: archivos del Big Data Bowl (`plays`, `games`, `players` y `pffScoutingData`). Van en la entrega, pero no están en el repositorio de GitHub, que es público.
-- `backend/mapa_touchdown.py`: lee los CSV con pandas, detecta los TD y genera el HTML.
-- `backend/mapa_touchdown.plantilla.html`: interfaz en HTML, CSS y JavaScript, sin librerías externas.
-- `mapa_touchdown.html`: resultado final (250 KB). `captura-mapa.png` y `captura-jugadores.png` son las imágenes de este README.
-- Stack: Python 3.12, pandas y numpy. No usa dependencias adicionales.
+- `backend/main.py`: API FastAPI con `GET /health` y `GET /api/mapa-touchdown`, que devuelve el mapa.
+- `backend/mapa_touchdown.py`: lee los CSV con pandas, detecta los TD y genera el HTML del mapa.
+- `backend/mapa_touchdown.plantilla.html`: interfaz del mapa en HTML, CSS y JavaScript, sin librerías externas.
+- `dashboard/src/App.tsx`: pantalla de inicio de la app. Incrusta el mapa con una ruta relativa (`api/mapa-touchdown`) y ajusta el marco a su alto. `dashboard/vite.config.ts` reenvía `/api` al backend en desarrollo.
+- `mapa_touchdown.html`: copia estática del mismo mapa (250 KB). `captura-mapa.png` y `captura-jugadores.png` son las imágenes de este README.
+- Stack: el del evento (FastAPI, React, Vite, Tailwind, pandas y numpy). No se agregaron dependencias.
