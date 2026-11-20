@@ -26,6 +26,23 @@ CARRILES = {"left": "izq", "middle": "cen", "right": "der"}
 RX_DESTINO = re.compile(
     r"(?:pass (?:incomplete )?(?:(?:short|deep) )?(?:(?:left|middle|right) )?to|intended for) (.+)"
 )
+RX_PROFUNDIDAD = re.compile(r"pass (?:incomplete )?(short|deep)\b")
+RX_INTERCEPTA = re.compile(r"INTERCEPTED by (.+)")
+# Punto de la intercepción: "INTERCEPTED by W.Jackson at WAS 4", "... [C.Ringo] at NO 7", "... (K.Young) at LA -8"
+RX_PUNTO_INT = re.compile(r"INTERCEPTED by \S+(?: [\[(][^\])]*[\])])* at (?:([A-Z]{2,3}) )?(-?\d+)")
+RX_SACK = re.compile(r"sacked .*? \(([^)]+)\)")
+
+# Datos de PFF que usa la simulación de cada jugada
+COLUMNAS_PFF = [
+    "gameId", "playId", "nflId", "pff_role", "pff_positionLinedUp", "pff_nflIdBlockedPlayer",
+    "pff_hit", "pff_hurry", "pff_sack", "pff_beatenByDefender", "pff_hitAllowed", "pff_hurryAllowed", "pff_sackAllowed",
+]
+ROLES = ["Pass", "Pass Route", "Pass Block", "Pass Rush", "Coverage"]
+BANDERAS = {
+    "pff_hit": 1, "pff_hurry": 2, "pff_sack": 4, "pff_beatenByDefender": 8,
+    "pff_hitAllowed": 16, "pff_hurryAllowed": 32, "pff_sackAllowed": 64,
+}
+OBJETIVO, INTERCEPTA = 128, 256
 
 
 def _ruta_csv(nombre: str) -> Path:
@@ -44,7 +61,7 @@ def cargar_datos() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFra
     plays = pd.read_csv(_ruta_csv("plays"))
     games = pd.read_csv(_ruta_csv("games"), usecols=["gameId", "season", "week"])
     players = pd.read_csv(_ruta_csv("players"), usecols=["nflId", "displayName", "officialPosition"])
-    pff = pd.read_csv(_ruta_csv("pffScoutingData"), usecols=["gameId", "playId", "nflId", "pff_role"])
+    pff = pd.read_csv(_ruta_csv("pffScoutingData"), usecols=COLUMNAS_PFF)
     return plays, games, players, pff
 
 
@@ -178,10 +195,76 @@ def _entero(x) -> int | None:
     return int(x) if pd.notna(x) else None
 
 
+def _texto(x) -> str | None:
+    return x if isinstance(x, str) and x else None
+
+
+def _punto_intercepcion(texto: str, ataca: str, defiende: str) -> int | None:
+    """Yardas a la zona de anotación donde se interceptó el pase. Negativo: dentro de la zona de anotación."""
+    m = RX_PUNTO_INT.search(texto)
+    if not m:
+        return None
+    equipo, n = m.group(1), int(m.group(2))
+    if equipo is None or equipo == defiende:
+        return n
+    return 100 - n if equipo == ataca else None
+
+
+def _alineaciones(base: pd.DataFrame, pff: pd.DataFrame, players: pd.DataFrame) -> tuple[list[str], dict]:
+    """Los 22 jugadores de cada jugada según PFF, para la simulación.
+
+    Cada jugador es [código de alineación, rol, banderas, índice del defensor al que bloquea]; las dos
+    últimas solo aparecen si hacen falta. También devuelve quién hizo el sack y quién interceptó.
+    """
+    s = pff.merge(base[["gameId", "playId", "objetivo", "texto", "passResult"]], on=["gameId", "playId"])
+    s = s[s.pff_role.isin(ROLES)].copy()
+    s["orden"] = s.pff_role.map({r: i for i, r in enumerate(ROLES)})
+    s = s.sort_values(["gameId", "playId", "orden", "pff_positionLinedUp", "nflId"]).reset_index(drop=True)
+    codigos = sorted(s.pff_positionLinedUp.unique())
+    num_cod = {c: i for i, c in enumerate(codigos)}
+    s["banderas"] = sum((s[c] == 1).astype(int) * v for c, v in BANDERAS.items())
+    s.loc[s.nflId == s.objetivo, "banderas"] += OBJETIVO
+    nombres = players.set_index("nflId").displayName.astype(str)
+    partes = {i: _partes_nombre(n) for i, n in nombres.items()}
+
+    salida = {}
+    for (g, p), j in s.groupby(["gameId", "playId"], sort=False):
+        ids = [int(x) for x in j.nflId]
+        indice = {nid: k for k, nid in enumerate(ids)}
+        ban = [int(b) for b in j.banderas]
+        texto, resultado = j.texto.iat[0], j.passResult.iat[0]
+        defensa = [k for k, rol in enumerate(j.pff_role) if rol in ("Pass Rush", "Coverage")]
+
+        intercepta = None
+        if resultado == "IN" and (m := RX_INTERCEPTA.search(texto)):
+            hits = [k for k in defensa if _coincide(m.group(1), *partes.get(ids[k], ("", "")))]
+            if len(hits) == 1:
+                ban[hits[0]] |= INTERCEPTA
+                intercepta = nombres.get(ids[hits[0]])
+            else:
+                intercepta = m.group(1).split(" ")[0].rstrip(".,")
+        sack = [nombres.get(ids[k], "") for k in defensa if ban[k] & BANDERAS["pff_sack"]]
+        if resultado == "S" and not sack and (m := RX_SACK.search(texto)):
+            sack = [m.group(1).replace(";", " y")]
+
+        ali = []
+        for k, (cod, rol, bloq) in enumerate(zip(j.pff_positionLinedUp, j.pff_role, j.pff_nflIdBlockedPlayer)):
+            fila = [num_cod[cod], ROLES.index(rol)]
+            b = indice.get(int(bloq)) if pd.notna(bloq) else None
+            if ban[k] or b is not None:
+                fila.append(ban[k])
+            if b is not None:
+                fila.append(b)
+            ali.append(fila)
+        salida[(g, p)] = {"ali": ali, "sk": " y ".join(x for x in sack if x) or None, "it": intercepta}
+    return codigos, salida
+
+
 def construir_datos(yardas: int = 20) -> tuple[dict, pd.DataFrame]:
     """Devuelve (datos para el HTML, base de jugadas en pandas)."""
     plays, games, players, pff = cargar_datos()
     base, conteos = preparar_jugadas(plays, games, pff, players, yardas)
+    codigos, alineacion = _alineaciones(base, pff, players)
     jugadas = [
         {
             "y": int(r.yardas),
@@ -196,6 +279,19 @@ def construir_datos(yardas: int = 20) -> tuple[dict, pd.DataFrame]:
             "qb": _entero(r.qb),
             "ob": _entero(r.objetivo),
             "txt": r.texto,
+            # Para la simulación de la jugada
+            "id": f"{r.gameId}-{r.playId}",
+            "ytg": int(r.yardsToGo),
+            "t": re.sub(r"^0(?=\d)", "", str(r.gameClock)),
+            "f": _texto(r.offenseFormation),
+            "db": _texto(r.dropBackType),
+            "pa": int(r.pff_playAction) if pd.notna(r.pff_playAction) else 0,
+            "cn": _texto(r.pff_passCoverage),
+            "p": r.passResult,
+            "g": int(r.prePenaltyPlayResult),
+            "pz": (m.group(1)[0] if (m := RX_PROFUNDIDAD.search(r.texto)) else None),
+            "xi": _punto_intercepcion(r.texto, r.possessionTeam, r.defensiveTeam) if r.passResult == "IN" else None,
+            **alineacion[(r.gameId, r.playId)],
         }
         for r in base.itertuples()
     ]
@@ -207,6 +303,8 @@ def construir_datos(yardas: int = 20) -> tuple[dict, pd.DataFrame]:
             "pases_total": len(plays),
             "yardas": yardas,
             **conteos,
+            "codigos": codigos,
+            "roles": ROLES,
         },
         "jugadores": _tabla_jugadores(base, players),
         "jugadas": jugadas,

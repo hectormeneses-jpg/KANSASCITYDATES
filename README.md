@@ -1,6 +1,6 @@
 # KANSASCITYDATES: probabilidad de touchdown en las últimas yardas
 
-Mapa interactivo del campo que muestra desde qué yarda y por qué carril es más probable que un pase termine en touchdown (TD), y qué receptores y quarterbacks lo convierten con más frecuencia. Usa las jugadas de pase de las semanas 1 a 8 de 2021 del NFL Big Data Bowl (datos de NFL Next Gen Stats y Pro Football Focus).
+Mapa interactivo del campo que muestra desde qué yarda y por qué carril es más probable que un pase termine en touchdown (TD), y qué receptores y quarterbacks lo convierten con más frecuencia. Incluye una simulación animada de cada una de las 1,072 jugadas analizadas. Usa las jugadas de pase de las semanas 1 a 8 de 2021 del NFL Big Data Bowl (datos de NFL Next Gen Stats y Pro Football Focus).
 
 ![Mapa de probabilidad de touchdown por yarda y carril del pase](captura-mapa.png)
 
@@ -27,21 +27,25 @@ Para quien toma decisiones de juego en la zona roja y para quien las analiza:
 
 ## Cómo verlo
 
-- **En la app publicada:** la página de inicio es el mapa. No hay que hacer nada más.
-- **En tu computadora, sin instalar nada:** abre `mapa_touchdown.html` con doble clic. Es un solo archivo y no necesita internet.
-- **En tu computadora, la app completa**, con el entorno ya instalado (`sh .hackathon/setup.sh`). En dos terminales:
+- **Demo en tu computadora (una sola dirección http):** con el entorno ya instalado (`sh .hackathon/setup.sh`), ejecuta
 
   ```bash
-  .venv/bin/uvicorn backend.main:app --reload   # API en el puerto 8000
-  cd dashboard && npm run dev                    # app en http://localhost:5173
+  .venv/bin/python -m backend.demo
   ```
 
-  Abre `http://localhost:5173` (no `127.0.0.1`). Si `npm` no está en tu PATH, usa el Node del proyecto: `export PATH="$PWD/.hackathon/.tools/node/bin:$PATH"`.
+  Abre `http://localhost:8000` en el navegador, con la app y la API en el mismo puerto, como en el hosting. Si cambiaste el dashboard, lo compila antes. Se detiene con Ctrl+C. Opciones: `--puerto 8001` y `--sin-navegador`.
+- **Cada jugada tiene su dirección:** al elegir una jugada, la dirección cambia a `http://localhost:8000/#jugada=<gameId>-<playId>`, por ejemplo `#jugada=2021091900-145`. Ese enlace abre la app directamente en esa simulación.
+- **En la app publicada:** la página de inicio es el mapa. No hay que hacer nada más.
+- **Sin instalar nada:** abre `mapa_touchdown.html` con doble clic. Es un solo archivo, incluye la simulación y no necesita internet.
+- **Modo desarrollo** (dos terminales, con recarga automática): `.venv/bin/uvicorn backend.main:app --reload` y `cd dashboard && npm run dev`, y luego abre `http://localhost:5173` (no `127.0.0.1`). Si `npm` no está en tu PATH, usa el Node del proyecto: `export PATH="$PWD/.hackathon/.tools/node/bin:$PATH"`.
 
 Cómo usarlo:
 
-1. Pasa el cursor sobre una celda para ver el detalle (TD, jugadas, rango de 95% y quién anotó ahí). Haz clic en la celda para filtrar la tabla de jugadores. Haz clic en un jugador para ver sus jugadas como puntos sobre el campo.
+1. Pasa el cursor sobre una celda para ver el detalle (TD, jugadas, rango de 95% y quién anotó ahí). Haz clic en la celda para filtrar la tabla de jugadores y la lista de jugadas. Haz clic en un jugador para ver sus jugadas como puntos sobre el campo, y en un punto para simular esa jugada.
 2. Filtra por down, cobertura de la defensa y equipo en ataque. Cambia el tamaño de celda (1, 2 o 5 yardas), alterna entre receptores y quarterbacks, y elige la zona (últimas 5, 10 o 20 yardas), el mínimo de jugadas y el orden de la tabla.
+3. En **Simulación de la jugada**, elige una jugada de la lista (o con ◀ ▶ y "Al azar") y dale ▶ Reproducir. El deslizador permite ir a cualquier momento, y la velocidad puede ser 0.5×, 1× o 2×.
+
+![Simulación de una jugada: pase de touchdown de Sam Darnold a Brandon Zylstra](captura-simulacion.png)
 
 ![Receptores con mayor probabilidad de acierto](captura-jugadores.png)
 
@@ -62,12 +66,14 @@ Opciones: `--yardas 25` cambia cuántas yardas finales se muestran (de 5 a 30) y
 - **Receptor:** el nombre abreviado de la descripción (`C.Godwin`) se cruza con los jugadores ofensivos de esa jugada en los datos de PFF. Los 238 TD por pase quedaron asignados a un receptor.
 - **Acierto de un jugador:** en receptores, TD entre objetivos. En quarterbacks, TD (de pase o scramble) entre jugadas de pase.
 - **Rangos:** intervalo de Wilson al 95%. Las celdas con menos de 5 jugadas aparecen rayadas y sin porcentaje.
+- **Simulación:** cada jugada se recrea en el campo con los 22 jugadores. De PFF sale quién juega, dónde se alinea al snap, quién bloquea a quién, quién presiona y quién hace el sack. De la descripción oficial salen el resultado, las yardas, el receptor, el carril, la profundidad del pase y el punto de la intercepción. Con eso se arman las rutas, los tiempos y las trayectorias. Una prueba automática recorre las 1,072 jugadas y confirma que cada simulación termina como la jugada real (yarda final, TD, sack, incompleto o intercepción) y que ningún jugador pasa de 9.2 yardas por segundo.
 
 ## Límites
 
 - Solo hay jugadas de pase. Es la probabilidad de TD cuando el equipo pasa, no la de anotar desde esa yarda.
 - Son 8 semanas de una temporada. Las celdas y los jugadores tienen pocas jugadas, por eso se muestran los rangos.
 - No se usaron los datos de tracking del Big Data Bowl, así que no se conoce la posición exacta del balón. El carril sale de la descripción de la jugada.
+- La simulación es una recreación aproximada, no una repetición. La alineación y el resultado son reales, pero las rutas de los receptores que no recibieron el pase, el punto exacto de la recepción y los tiempos son estimados.
 - Se revisaron varios cortes (yarda, carril, down y cobertura) sin corregir por comparaciones múltiples. Solo la caída de la probabilidad con la distancia es contundente. Lo demás son indicios.
 - Las coberturas se agrupan como las entrega PFF: "Otra" incluye Red Zone, Goal Line y Bracket. Compara siempre dentro del mismo tramo de yardas.
 
@@ -75,8 +81,9 @@ Opciones: `--yardas 25` cambia cuántas yardas finales se muestran (de 5 a 30) y
 
 - `data/`: archivos del Big Data Bowl (`plays`, `games`, `players` y `pffScoutingData`). Van en la entrega, pero no están en el repositorio de GitHub, que es público.
 - `backend/main.py`: API FastAPI con `GET /health` y `GET /api/mapa-touchdown`, que devuelve el mapa.
-- `backend/mapa_touchdown.py`: lee los CSV con pandas, detecta los TD y genera el HTML del mapa.
-- `backend/mapa_touchdown.plantilla.html`: interfaz del mapa en HTML, CSS y JavaScript, sin librerías externas.
-- `dashboard/src/App.tsx`: pantalla de inicio de la app. Incrusta el mapa con una ruta relativa (`api/mapa-touchdown`) y ajusta el marco a su alto. `dashboard/vite.config.ts` reenvía `/api` al backend en desarrollo.
-- `mapa_touchdown.html`: copia estática del mismo mapa (250 KB). `captura-mapa.png` y `captura-jugadores.png` son las imágenes de este README.
+- `backend/demo.py`: demo local en `http://localhost:8000` (dashboard compilado y API en el mismo puerto). El hosting no lo usa.
+- `backend/mapa_touchdown.py`: lee los CSV con pandas, detecta los TD, prepara los 22 jugadores de cada jugada y genera el HTML del mapa.
+- `backend/mapa_touchdown.plantilla.html`: interfaz del mapa y de la simulación en HTML, CSS y JavaScript, sin librerías externas.
+- `dashboard/src/App.tsx`: pantalla de inicio de la app. Incrusta el mapa con una ruta relativa (`api/mapa-touchdown`), ajusta el marco a su alto y mantiene en la dirección la jugada que se está simulando. `dashboard/vite.config.ts` reenvía `/api` al backend en desarrollo.
+- `mapa_touchdown.html`: copia estática del mismo mapa con la simulación (650 KB). `captura-mapa.png`, `captura-jugadores.png` y `captura-simulacion.png` son las imágenes de este README.
 - Stack: el del evento (FastAPI, React, Vite, Tailwind, pandas y numpy). No se agregaron dependencias.
